@@ -1,0 +1,27 @@
+{
+  "name": "nodejs-oauth2-jwt-secure-rest-api",
+  "version": "1.0.0",
+  "description": "",
+  "main": "app.js",
+  "scripts": {
+    "build": "rm -rf dist && babel src -d dist --source-maps",
+    "start": "npm run build && node dist/app.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "babel-polyfill": "^6.26.0",
+    "bcrypt": "^1.0.3",
+    "body-parser": "^1.18.2",
+    "express": "^4.16.2",
+    "express-promise-router": "^2.0.0",
+    "jsonwebtoken": "^8.1.0",
+    "morgan": "^1.9.0",
+    "pg": "^7.4.0"
+  },
+  "devDependencies": {
+    "babel-cli": "^6.26.0",
+    "babel-preset-env": "^1.6.1"
+  }
+}
