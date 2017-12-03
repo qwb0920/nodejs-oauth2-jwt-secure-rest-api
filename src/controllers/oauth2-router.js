@@ -71,6 +71,94 @@ const createRefreshToken = async (user, roles, ati, jti) => {
 	return token;
 };
 
+const grantTypePasswordRequest = async (req, res) => {
+	if (req.body.username && req.body.password) {
+		const client = await database.connect();
+		try {
+			const user = await UserService.login(client, req.body.username, req.body.password);
+			if (user) {
+				const roles = await UserService.getUsersRoles(client, user.us_id);
+				const jti = createJti(32);
+				const jti2 = createJti(32);
+				const accessToken = await createAccessToken(user, roles, jti);
+				const refreshToken = await createRefreshToken(user, roles, jti, jti2);
+				res.json({
+					access_token: accessToken,
+					token_type: 'bearer',
+					refresh_token: refreshToken,
+					expires_in: config.oauth2.accessTokenValiditySeconds,
+					scope: 'read write',
+					jti: jti
+				});
+			}
+			else {
+				res.status(400).json(Errors.create(req, 400, 'invalid_grant', 'Bad credentials'));
+			}
+		}
+		catch (err) {
+			throw err;
+		}
+		finally {
+			client.release();
+		}
+	}
+	else {
+		res.status(400).json(Errors.create(req, 400, 'invalid_grant', 'Bad credentials'));
+	}
+};
+
+const grantTypeRefreshTokenRequest = async (req, res) => {
+	if (req.body.refresh_token) {
+		let decoded = undefined;
+		try {
+			decoded = await jwtPromise.verify(req.body.refresh_token, config.jwt.secret);
+		}
+		catch (err) {
+		}
+		if (decoded) {
+			if (decoded.ati) {
+				const client = await database.connect();
+				try {
+					const user = await UserService.getUserByLogin(client, decoded.user_name);
+					if (user) {
+						const roles = await UserService.getUsersRoles(client, user.us_id);
+						const jti = createJti(32);
+						const jti2 = createJti(32);
+						const accessToken = await createAccessToken(user, roles, jti);
+						const refreshToken = await createRefreshToken(user, roles, jti, jti2);
+						res.json({
+							access_token: accessToken,
+							token_type: 'bearer',
+							refresh_token: refreshToken,
+							expires_in: config.oauth2.accessTokenValiditySeconds,
+							scope: 'read write',
+							jti: jti
+						});
+					}
+					else {
+						res.status(400).json(Errors.create(req, 400, 'invalid_grant', 'Bad credentials'));
+					}
+				}
+				catch (err) {
+					throw err;
+				}
+				finally {
+					client.release();
+				}
+			}
+			else {
+				return res.status(401).json(Errors.create(req, 401, 'invalid_token', 'Encoded token is not a refresh token'));
+			}
+		}
+		else {
+			res.status(400).json(Errors.create(req, 400, 'invalid_grant', 'Bad credentials'));
+		}
+	}
+	else {
+		res.status(400).json(Errors.create(req, 400, 'invalid_grant', 'Bad credentials'));
+	}
+};
+
 /**
  * Zalogowanie użytkownika i odebranie tokenów.
  * Nagłówek: Authorization: Basic [clientId]:[secret]
@@ -89,48 +177,10 @@ router.route('/token').post(async (req, res) => {
 					res.status(400).json(Errors.create(req, 400, 'invalid_request', 'Missing grant type'));
 				}
 				else if (req.body.grant_type === 'password') {
-					if (req.body.username && req.body.password) {
-						const client = await database.connect();
-						try {
-							const user = await UserService.login(client, req.body.username, req.body.password);
-							if (user) {
-								const roles = await UserService.getUsersRoles(client, user.us_id);
-								const jti = createJti(32);
-								const jti2 = createJti(32);
-								const accessToken = await createAccessToken(user, roles, jti);
-								const refreshToken = await createRefreshToken(user, roles, jti, jti2);
-								res.json({
-									access_token: accessToken,
-									token_type: 'bearer',
-									refresh_token: refreshToken,
-									expires_in: config.oauth2.accessTokenValiditySeconds,
-									scope: 'read write',
-									jti: jti
-								});
-							}
-							else {
-								res.status(400).json(Errors.create(req, 400, 'invalid_grant', 'Bad credentials'));
-							}
-						}
-						catch (err) {
-							throw err;
-						}
-						finally {
-							client.release();
-						}
-					}
-					else {
-						res.status(400).json(Errors.create(req, 400, 'invalid_grant', 'Bad credentials'));
-					}
+					await grantTypePasswordRequest(req, res);
 				}
 				else if (req.body.grant_type === 'refresh_token') {
-					if (req.body.refresh_token) {
-						// TODO:
-						res.send('TODO: Refresh token inplementation.');
-					}
-					else {
-						res.status(400).json(Errors.create(req, 400, 'invalid_grant', 'Bad credentials'));
-					}
+					await grantTypeRefreshTokenRequest(req, res);
 				}
 				else {
 					res.status(400).json(Errors.create(req, 400, 'unsupported_grant_type', `Unsupported grant type`));

@@ -39,5 +39,15 @@ export const UserService = {
 	},
 	getUsersRoles: async (client, userId) => {
 		return await UsersRepository.getUsersRoles(client, userId);
+	},
+	getUserByLogin: async (client, username) => {
+		let obj = undefined;
+
+		const rows = await UsersRepository.getUsersByLogin(client, username);
+		if (rows.length == 1) {
+			obj = rows[0];
+		}
+
+		return obj;
 	}
 };
